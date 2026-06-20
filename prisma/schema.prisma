@@ -1,0 +1,36 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  candidate
+  company
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  role         UserRole
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  company Company?
+
+  @@map("users")
+}
+
+model Company {
+  id       String  @id @default(uuid())
+  userId   String  @unique @map("user_id")
+  user     User    @relation(fields: [userId], references: [id])
+  name     String
+  logoUrl  String? @map("logo_url")
+  industry String?
+
+  @@map("companies")
+}
