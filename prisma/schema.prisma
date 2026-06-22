@@ -12,6 +12,19 @@ enum UserRole {
   company
 }
 
+enum JobStatus {
+  draft
+  open
+  closed
+}
+
+enum ApplicationStatus {
+  applied
+  shortlisted
+  rejected
+  hired
+}
+
 model User {
   id           String   @id @default(uuid())
   email        String   @unique
@@ -19,7 +32,8 @@ model User {
   role         UserRole
   createdAt    DateTime @default(now()) @map("created_at")
 
-  company Company?
+  company      Company?
+  applications Application[]
 
   @@map("users")
 }
@@ -32,5 +46,35 @@ model Company {
   logoUrl  String? @map("logo_url")
   industry String?
 
+  jobs Job[]
+
   @@map("companies")
+}
+
+model Job {
+  id             String    @id @default(uuid())
+  companyId      String    @map("company_id")
+  company        Company   @relation(fields: [companyId], references: [id])
+  title          String
+  description    String
+  skillsRequired String[]  @map("skills_required")
+  status         JobStatus @default(draft)
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  applications Application[]
+
+  @@map("jobs")
+}
+
+model Application {
+  id          String            @id @default(uuid())
+  jobId       String            @map("job_id")
+  job         Job               @relation(fields: [jobId], references: [id])
+  candidateId String            @map("candidate_id")
+  candidate   User              @relation(fields: [candidateId], references: [id])
+  status      ApplicationStatus @default(applied)
+  appliedAt   DateTime          @default(now()) @map("applied_at")
+
+  @@unique([jobId, candidateId])
+  @@map("applications")
 }
