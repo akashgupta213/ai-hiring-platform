@@ -6,8 +6,8 @@ import { usePathname, useRouter } from "next/navigation";
 
 const NAV_LINKS = [
   { label: "Browse Jobs", href: "/candidate/jobs" },
-  { label: "Applications", href: "/applications" },
-  { label: "Messages", href: "/messages" },
+  { label: "Applications", href: "/candidate/applications" },
+  { label: "Messages", href: "/candidate/messages" },
 ];
 
 export default function Navbar() {
