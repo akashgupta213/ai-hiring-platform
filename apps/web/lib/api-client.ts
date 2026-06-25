@@ -4,10 +4,7 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
   const headers: Record<string, string> = {
     ...(options.headers as Record<string, string>),
   };
-
-  if (options.body) {
-    headers["Content-Type"] = "application/json";
-  }
+  if (options.body) headers["Content-Type"] = "application/json";
 
   const res = await fetch(`${API_URL}${path}`, {
     ...options,
@@ -29,35 +26,19 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
   return data as T;
 }
 
-// ── Jobs ─────────────────────────────────────────────────────────────────────
-
-export function getJobs(params?: {
-  page?: number;
-  limit?: number;
-  search?: string;
-}) {
+// ── Jobs ──────────────────────────────────────────────────────────────────────
+export function getJobs(params?: { page?: number; limit?: number; search?: string }) {
   const q = new URLSearchParams();
   if (params?.page) q.set("page", String(params.page));
   if (params?.limit) q.set("limit", String(params.limit));
   if (params?.search) q.set("search", params.search);
   return apiFetch<any>(`/jobs?${q}`);
 }
-
-export function getJob(id: string) {
-  return apiFetch<any>(`/jobs/${id}`);
-}
-
-export function createJob(data: any) {
-  return apiFetch<any>("/jobs", { method: "POST", body: JSON.stringify(data) });
-}
-
+export function getJob(id: string) { return apiFetch<any>(`/jobs/${id}`); }
+export function createJob(data: any) { return apiFetch<any>("/jobs", { method: "POST", body: JSON.stringify(data) }); }
 export function updateJobStatus(id: string, status: string) {
-  return apiFetch<any>(`/jobs/${id}/status`, {
-    method: "PATCH",
-    body: JSON.stringify({ status }),
-  });
+  return apiFetch<any>(`/jobs/${id}/status`, { method: "PATCH", body: JSON.stringify({ status }) });
 }
-
 export function getCompanyJobs(params?: { page?: number; status?: string }) {
   const q = new URLSearchParams();
   if (params?.page) q.set("page", String(params.page));
@@ -65,23 +46,24 @@ export function getCompanyJobs(params?: { page?: number; status?: string }) {
   return apiFetch<any>(`/company/jobs?${q}`);
 }
 
-// ── Applications ─────────────────────────────────────────────────────────────
-
-export function applyToJob(jobId: string) {
-  return apiFetch<any>(`/applications/${jobId}`, { method: "POST" });
-}
-
-export function getMyApplications() {
-  return apiFetch<any>("/applications/me");
-}
-
-export function getJobApplications(jobId: string) {
-  return apiFetch<any>(`/jobs/${jobId}/applications`);
-}
-
+// ── Applications ──────────────────────────────────────────────────────────────
+export function applyToJob(jobId: string) { return apiFetch<any>(`/applications/${jobId}`, { method: "POST" }); }
+export function getMyApplications() { return apiFetch<any>("/applications/me"); }
+export function getJobApplications(jobId: string) { return apiFetch<any>(`/jobs/${jobId}/applications`); }
 export function updateApplicationStatus(id: string, status: string) {
-  return apiFetch<any>(`/applications/${id}/status`, {
-    method: "PATCH",
-    body: JSON.stringify({ status }),
-  });
+  return apiFetch<any>(`/applications/${id}/status`, { method: "PATCH", body: JSON.stringify({ status }) });
+}
+
+// ── Resume ────────────────────────────────────────────────────────────────────
+export function getMyResume() {
+  return apiFetch<any>("/resume/me");
+}
+export function uploadResume(text: string) {
+  return apiFetch<any>("/resume/upload", { method: "POST", body: JSON.stringify({ text }) });
+}
+export function getResumeAIInsight() {
+  return apiFetch<any>("/resume/ai-insight");
+}
+export function getRecommendedJobs() {
+  return apiFetch<any>("/resume/recommended-jobs");
 }

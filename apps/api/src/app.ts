@@ -5,6 +5,8 @@ import { env } from "./env";
 import { authRoutes } from "./routes/auth.routes";
 import { jobRoutes } from "./routes/jobs.routes";
 import { applicationRoutes } from "./routes/applications.routes";
+import { conversationRoutes } from "./routes/conversations.routes";
+import { resumeRoutes } from "./routes/resume.routes";
 
 export function buildApp() {
   const app = Fastify({ logger: true });
@@ -21,6 +23,8 @@ export function buildApp() {
   app.register(authRoutes);
   app.register(jobRoutes);
   app.register(applicationRoutes);
+  app.register(conversationRoutes);
+  app.register(resumeRoutes);
 
   app.setErrorHandler((error, _request, reply) => {
     app.log.error(error);

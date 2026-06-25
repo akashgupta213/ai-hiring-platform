@@ -34,7 +34,11 @@ model User {
 
   company      Company?
   applications Application[]
+  sentMessages     Message[]      @relation("SentMessages")
+  conversations    ConversationParticipant[]
 
+  resume       Resume?
+  
   @@map("users")
 }
 
@@ -61,7 +65,8 @@ model Job {
   status         JobStatus @default(draft)
   createdAt      DateTime  @default(now()) @map("created_at")
 
-  applications Application[]
+  applications   Application[]
+  conversations  Conversation[]
 
   @@map("jobs")
 }
@@ -77,4 +82,55 @@ model Application {
 
   @@unique([jobId, candidateId])
   @@map("applications")
+}
+
+model Resume {
+  id           String   @id @default(uuid())
+  userId       String   @unique @map("user_id")
+  user         User     @relation(fields: [userId], references: [id])
+  rawText      String   @map("raw_text")
+  skills       String[]
+  score        Int      @default(0)
+  readability  Int      @default(0)
+  keywordMatch Int      @default(0) @map("keyword_match")
+  uploadedAt   DateTime @default(now()) @map("uploaded_at")
+
+  @@map("resumes")
+}
+
+model Conversation {
+  id        String   @id @default(uuid())
+  jobId     String?  @map("job_id")
+  job       Job?     @relation(fields: [jobId], references: [id])
+  createdAt DateTime @default(now()) @map("created_at")
+
+  participants ConversationParticipant[]
+  messages     Message[]
+
+  @@map("conversations")
+}
+
+model ConversationParticipant {
+  conversationId String       @map("conversation_id")
+  userId         String       @map("user_id")
+  conversation   Conversation @relation(fields: [conversationId], references: [id])
+  user           User         @relation(fields: [userId], references: [id])
+  unreadCount    Int          @default(0) @map("unread_count")
+  lastReadAt     DateTime?    @map("last_read_at")
+
+  @@id([conversationId, userId])
+  @@map("conversation_participants")
+}
+
+model Message {
+  id             String       @id @default(uuid())
+  conversationId String       @map("conversation_id")
+  conversation   Conversation @relation(fields: [conversationId], references: [id])
+  senderId       String       @map("sender_id")
+  sender         User         @relation("SentMessages", fields: [senderId], references: [id])
+  body           String
+  createdAt      DateTime     @default(now()) @map("created_at")
+  readAt         DateTime?    @map("read_at")
+
+  @@map("messages")
 }
