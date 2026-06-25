@@ -1,5 +1,4 @@
 import { Worker, Job } from "bullmq";
-import pdfParse from "pdf-parse";
 import { prisma } from "../lib/prisma";
 import { downloadFromS3 } from "../services/s3";
 import {
@@ -14,7 +13,13 @@ import {
   getConnection,
 } from "../queues";
 
-// ─── Worker ─────────────────────────────────────────────────────────────────────
+// ─── Fix: pdf-parse is a CJS module and does not work with ESM default import ──
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const pdfParse = require("pdf-parse") as (
+  buffer: Buffer
+) => Promise<{ text: string; numpages: number; info: any }>;
+
+// ─── Worker ──────────────────────────────────────────────────────────────────
 
 export const resumeParseWorker = new Worker<ResumeParseJobData>(
   QUEUE_NAMES.RESUME_PARSE,
@@ -23,7 +28,7 @@ export const resumeParseWorker = new Worker<ResumeParseJobData>(
 
     console.log(`[resume-parse] Starting job for resume ${resumeId}`);
 
-    // ── Step 1: Download PDF from S3 ──────────────────────────────────────────
+    // ── Step 1: Download PDF from S3 ─────────────────────────────────────────
     await job.updateProgress(10);
     let pdfBuffer: Buffer;
     try {
@@ -43,7 +48,9 @@ export const resumeParseWorker = new Worker<ResumeParseJobData>(
     }
 
     if (!rawText || rawText.length < 50) {
-      throw new Error("PDF appears to be empty or unreadable (< 50 chars extracted)");
+      throw new Error(
+        "PDF appears to be empty or unreadable (< 50 chars extracted)"
+      );
     }
 
     console.log(
@@ -72,30 +79,32 @@ export const resumeParseWorker = new Worker<ResumeParseJobData>(
     console.log(`[resume-parse] Saved parsed resume for ${resumeId}`);
 
     // ── Step 5: Enqueue embedding job ─────────────────────────────────────────
-    await job.updateProgress(90);
-    const embeddingText = buildResumeEmbeddingText(parsedJson);
+    // await job.updateProgress(90);
+    // const embeddingText = buildResumeEmbeddingText(parsedJson);
 
-    const embedJobData: ResumeEmbedJobData = {
-      resumeId,
-      rawText: embeddingText,
-      applicationId,
-    };
-    await resumeEmbedQueue.add("embed-resume", embedJobData, {
-      priority: 1,
-    });
+    // const embedJobData: ResumeEmbedJobData = {
+    //   resumeId,
+    //   rawText: embeddingText,
+    //   applicationId,
+    // };
+    // await resumeEmbedQueue.add("embed-resume", embedJobData, {
+    //   priority: 1,
+    // });
 
     await job.updateProgress(100);
-    console.log(`[resume-parse] Completed for resume ${resumeId}, embed job queued`);
+    console.log(
+      `[resume-parse] Completed for resume ${resumeId}, embed job queued`
+    );
 
     return { resumeId, parsedJson };
   },
   {
     connection: getConnection(),
-    concurrency: 5, // Process up to 5 resumes in parallel
+    concurrency: 5,
   }
 );
 
-// ─── Event Handlers ──────────────────────────────────────────────────────────────
+// ─── Event Handlers ──────────────────────────────────────────────────────────
 
 resumeParseWorker.on("completed", (job) => {
   console.log(`[resume-parse] Job ${job.id} completed`);

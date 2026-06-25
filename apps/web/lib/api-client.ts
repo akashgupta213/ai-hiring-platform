@@ -55,8 +55,9 @@ export function updateApplicationStatus(id: string, status: string) {
 }
 
 // ── Resume ────────────────────────────────────────────────────────────────────
-export function getMyResume() {
-  return apiFetch<any>("/resume/me");
+export async function getMyResume() {
+    const data = await apiFetch<any>("/resumes/me");
+    return data.resume;
 }
 export function uploadResume(text: string) {
   return apiFetch<any>("/resume/upload", { method: "POST", body: JSON.stringify({ text }) });

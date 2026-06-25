@@ -1,7 +1,9 @@
-import OpenAI from "openai";
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+// import OpenAI from "openai";
+import Groq from "groq-sdk";
+// const openai = new OpenAI({
+const openai = new Groq({
+  // apiKey: process.env.OPENAI_API_KEY,
+  apiKey: process.env.GROQ_API_KEY,
 });
 
 // ─── Embeddings ────────────────────────────────────────────────────────────────
@@ -43,7 +45,8 @@ export interface ParsedResume {
  */
 export async function parseResumeText(rawText: string): Promise<ParsedResume> {
   const response = await openai.chat.completions.create({
-    model: "gpt-4o-mini",
+    // model: "gpt-4o-mini",
+    model: "llama-3.3-70b-versatile",
     messages: [
       {
         role: "system",
@@ -89,7 +92,8 @@ If a field cannot be found, use an empty string or empty array. Never return nul
   } catch {
     // Retry with stricter prompt on parse failure
     const retryResponse = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+      // model: "gpt-4o-mini",
+      model: "llama-3.3-70b-versatile",
       messages: [
         {
           role: "system",

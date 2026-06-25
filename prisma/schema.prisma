@@ -37,7 +37,7 @@ model User {
   sentMessages     Message[]      @relation("SentMessages")
   conversations    ConversationParticipant[]
 
-  resume       Resume?
+  resume       Resume[]
   
   @@map("users")
 }
@@ -77,6 +77,8 @@ model Application {
   job         Job               @relation(fields: [jobId], references: [id])
   candidateId String            @map("candidate_id")
   candidate   User              @relation(fields: [candidateId], references: [id])
+  resumeId    String?           @map("resume_id")
+  resume      Resume?           @relation(fields: [resumeId], references: [id])
   status      ApplicationStatus @default(applied)
   appliedAt   DateTime          @default(now()) @map("applied_at")
 
@@ -85,15 +87,15 @@ model Application {
 }
 
 model Resume {
-  id           String   @id @default(uuid())
-  userId       String   @unique @map("user_id")
-  user         User     @relation(fields: [userId], references: [id])
-  rawText      String   @map("raw_text")
-  skills       String[]
-  score        Int      @default(0)
-  readability  Int      @default(0)
-  keywordMatch Int      @default(0) @map("keyword_match")
-  uploadedAt   DateTime @default(now()) @map("uploaded_at")
+  id          String   @id @default(uuid())
+  candidateId String   @map("candidate_id")
+  candidate   User     @relation(fields: [candidateId], references: [id])
+  s3Key       String   @map("s3_key")
+  rawText     String   @default("") @map("raw_text")
+  parsedJson  Json?    @map("parsed_json")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  applications Application[]
 
   @@map("resumes")
 }

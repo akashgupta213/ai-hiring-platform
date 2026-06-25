@@ -5,34 +5,47 @@ import {
   DeleteObjectCommand,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import {
+  isLocalStorage,
+  getLocalUploadUrl,
+  saveLocalFile,
+  readLocalFile,
+  deleteLocalFile,
+} from "./local-storage";
 
-// ─── S3 Client ─────────────────────────────────────────────────────────────────
+// ─── S3 Client ────────────────────────────────────────────────────────────────
 
 const s3 = new S3Client({
-  region: process.env.AWS_REGION ?? "us-east-1",
+  region: process.env.AWS_REGION ?? "auto",
   credentials: {
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID ?? "placeholder",
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY ?? "placeholder",
   },
-  // Support Cloudflare R2 or other S3-compatible stores
   ...(process.env.S3_ENDPOINT
     ? { endpoint: process.env.S3_ENDPOINT, forcePathStyle: true }
     : {}),
 });
 
-const BUCKET = process.env.S3_BUCKET_NAME!;
+const BUCKET = process.env.S3_BUCKET_NAME ?? "local";
 
-// ─── Presigned Upload URL ───────────────────────────────────────────────────────
+// ─── Presigned Upload URL ─────────────────────────────────────────────────────
 
 /**
  * Generate a presigned URL for direct browser-to-S3 upload.
- * Expires in 10 minutes by default.
+ * Falls back to local storage URL if no S3 keys configured.
  */
 export async function getUploadPresignedUrl(
   key: string,
   contentType: string,
   expiresIn = 600
 ): Promise<string> {
+  // ── Local storage fallback ──────────────────────────────────────────────────
+  if (isLocalStorage()) {
+    console.log(`[storage] Using local storage for key: ${key}`);
+    return getLocalUploadUrl(key);
+  }
+
+  // ── Real S3/R2 ──────────────────────────────────────────────────────────────
   const command = new PutObjectCommand({
     Bucket: BUCKET,
     Key: key,
@@ -41,13 +54,18 @@ export async function getUploadPresignedUrl(
   return getSignedUrl(s3, command, { expiresIn });
 }
 
-// ─── Download File as Buffer ────────────────────────────────────────────────────
+// ─── Download File as Buffer ──────────────────────────────────────────────────
 
 /**
- * Download a file from S3 and return it as a Buffer.
- * Used by workers that need to process files (resume PDF, video).
+ * Download a file from S3 or local disk and return it as a Buffer.
  */
 export async function downloadFromS3(key: string): Promise<Buffer> {
+  // ── Local storage fallback ──────────────────────────────────────────────────
+  if (isLocalStorage()) {
+    return readLocalFile(key);
+  }
+
+  // ── Real S3/R2 ──────────────────────────────────────────────────────────────
   const command = new GetObjectCommand({ Bucket: BUCKET, Key: key });
   const response = await s3.send(command);
 
@@ -55,7 +73,6 @@ export async function downloadFromS3(key: string): Promise<Buffer> {
     throw new Error(`Empty response body for S3 key: ${key}`);
   }
 
-  // Convert stream to buffer
   const chunks: Uint8Array[] = [];
   const stream = response.Body as NodeJS.ReadableStream;
 
@@ -66,16 +83,22 @@ export async function downloadFromS3(key: string): Promise<Buffer> {
   });
 }
 
-// ─── Upload Buffer to S3 ───────────────────────────────────────────────────────
+// ─── Upload Buffer ────────────────────────────────────────────────────────────
 
 /**
- * Upload a buffer directly to S3. Used for server-side uploads.
+ * Upload a buffer to S3 or local disk.
  */
 export async function uploadToS3(
   key: string,
   buffer: Buffer,
   contentType: string
 ): Promise<void> {
+  // ── Local storage fallback ──────────────────────────────────────────────────
+  if (isLocalStorage()) {
+    return saveLocalFile(key, buffer);
+  }
+
+  // ── Real S3/R2 ──────────────────────────────────────────────────────────────
   const command = new PutObjectCommand({
     Bucket: BUCKET,
     Key: key,
@@ -85,27 +108,25 @@ export async function uploadToS3(
   await s3.send(command);
 }
 
-// ─── Delete Object ─────────────────────────────────────────────────────────────
+// ─── Delete Object ────────────────────────────────────────────────────────────
 
 export async function deleteFromS3(key: string): Promise<void> {
+  if (isLocalStorage()) {
+    return deleteLocalFile(key);
+  }
+
   const command = new DeleteObjectCommand({ Bucket: BUCKET, Key: key });
   await s3.send(command);
 }
 
-// ─── Key Generators ────────────────────────────────────────────────────────────
+// ─── Key Generators ───────────────────────────────────────────────────────────
 
-/**
- * Generate a unique S3 key for a resume PDF.
- */
 export function resumeS3Key(candidateId: string, filename: string): string {
   const timestamp = Date.now();
   const safe = filename.replace(/[^a-zA-Z0-9._-]/g, "_");
   return `resumes/${candidateId}/${timestamp}_${safe}`;
 }
 
-/**
- * Generate a unique S3 key for a video answer chunk.
- */
 export function videoS3Key(
   answerId: string,
   chunkIndex: number,

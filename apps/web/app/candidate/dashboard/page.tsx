@@ -81,33 +81,62 @@ export default function CandidateDashboardPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  async function handleResumeUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setResumeUploading(true);
-    setResumeError(null);
-    try {
-      // Read file as text (works for .txt; for PDF use pdfjs in production)
-      const text = await file.text();
-      if (text.length < 50) {
-        setResumeError("File appears empty. Please upload a text-based resume (.txt or copy-paste).");
+ async function handleResumeUpload(e: React.ChangeEvent<HTMLInputElement>) {
+  const file = e.target.files?.[0];
+  if (!file) return;
+  if (file.type !== "application/pdf" && !file.name.endsWith(".pdf")) {
+    setResumeError("Only PDF files are accepted");
+    return;
+  }
+
+  setResumeUploading(true);
+  setResumeError(null);
+
+  try {
+    // Step 1: Get presigned S3 URL
+    const { presignedUrl, s3Key } = await apiFetch<any>("/resumes/upload-url", {
+      method: "POST",
+      body: JSON.stringify({ filename: file.name, contentType: "application/pdf" }),
+    });
+
+    // Step 2: Upload PDF directly to S3
+    const uploadRes = await fetch(presignedUrl, {
+      method: "PUT",
+      headers: { "Content-Type": "application/pdf" },
+      body: file,
+    });
+    if (!uploadRes.ok) throw new Error("Failed to upload to S3");
+
+    // Step 3: Trigger parse pipeline
+    const { resumeId } = await apiFetch<any>("/resumes/parse", {
+      method: "POST",
+      body: JSON.stringify({ s3Key }),
+    });
+
+    // Step 4: Poll until parsed
+    for (let i = 0; i < 30; i++) {
+      await new Promise((r) => setTimeout(r, 2000));
+      const status = await apiFetch<any>(`/resumes/${resumeId}/status`);
+      if (status.status === "completed") {
+        const [res, ins, jobs] = await Promise.all([
+          getMyResume().catch(() => null),
+          getResumeAIInsight().catch(() => null),
+          getRecommendedJobs().catch(() => []),
+        ]);
+        setResume(res);
+        setInsight(ins);
+        setRecommendedJobs(Array.isArray(jobs) ? jobs : []);
         return;
       }
-      const result = await uploadResume(text);
-      setResume(result);
-      // Refresh insight and recommended jobs
-      const [ins, jobs] = await Promise.all([
-        getResumeAIInsight().catch(() => null),
-        getRecommendedJobs().catch(() => []),
-      ]);
-      setInsight(ins);
-      setRecommendedJobs(Array.isArray(jobs) ? jobs : []);
-    } catch (err: any) {
-      setResumeError(err?.message ?? "Upload failed");
-    } finally {
-      setResumeUploading(false);
     }
+
+    throw new Error("Parsing timed out — check back in a moment");
+  } catch (err: any) {
+    setResumeError(err?.message ?? "Upload failed");
+  } finally {
+    setResumeUploading(false);
   }
+}
 
   const counts = {
     applied: applications.length,
@@ -150,7 +179,7 @@ export default function CandidateDashboardPage() {
       <input
         ref={fileInputRef}
         type="file"
-        accept=".txt,.md"
+        accept=".txt,.md,.pdf"
         className="hidden"
         onChange={handleResumeUpload}
       />
@@ -187,7 +216,7 @@ export default function CandidateDashboardPage() {
           )}
           {resume && (
             <div className="mt-2 text-sm text-emerald-600 bg-emerald-50 border border-emerald-200 px-4 py-2 rounded-lg">
-              ✓ Resume analyzed — {resume.skills.length} skills detected. Score: {resume.score}/100
+              ✓ Resume analyzed — {resume.parsedJson.skills.length} skills detected. Score: {resume.score}/100
             </div>
           )}
         </section>
@@ -225,12 +254,12 @@ export default function CandidateDashboardPage() {
                 </div>
                 <h2 className="font-display-lg text-headline-lg text-white mb-sm">
                   {resume
-                    ? `Your resume has ${resume.skills.length} skills — let AI find your best matches`
+                    ? `Your resume has ${resume.parsedJson.skills.length} skills — let AI find your best matches`
                     : "Accelerate your career with AI-driven insights"}
                 </h2>
                 <p className="font-body-lg text-body-lg text-surface-container-highest mb-md opacity-90">
                   {resume
-                    ? `We detected: ${resume.skills.slice(0, 5).join(", ")}${resume.skills.length > 5 ? ` and ${resume.skills.length - 5} more` : ""}. Upload a newer resume to keep matches fresh.`
+                    ? `We detected: ${resume.parsedJson.skills.slice(0, 5).join(", ")}${resume.parsedJson.skills.length > 5 ? ` and ${resume.parsedJson.skills.length - 5} more` : ""}. Upload a newer resume to keep matches fresh.`
                     : "Upload your resume to unlock AI-powered job matching, skill gap analysis, and personalized recommendations."}
                 </p>
                 <div className="flex gap-md">
@@ -368,11 +397,11 @@ export default function CandidateDashboardPage() {
                       <div className="pt-sm border-t border-slate-100">
                         <span className="font-label-caps text-[10px] text-slate-400 uppercase block mb-1">Detected Skills</span>
                         <div className="flex flex-wrap gap-1">
-                          {resume.skills.slice(0, 6).map((s: string) => (
+                          {resume.parsedJson.skills.slice(0, 6).map((s: string) => (
                             <span key={s} className="px-2 py-0.5 bg-slate-100 text-slate-600 text-[10px] rounded">{s}</span>
                           ))}
-                          {resume.skills.length > 6 && (
-                            <span className="px-2 py-0.5 text-slate-400 text-[10px]">+{resume.skills.length - 6} more</span>
+                          {resume.parsedJson.skills.length > 6 && (
+                            <span className="px-2 py-0.5 text-slate-400 text-[10px]">+{resume.parsedJson.skills.length - 6} more</span>
                           )}
                         </div>
                       </div>

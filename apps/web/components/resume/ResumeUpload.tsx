@@ -80,7 +80,6 @@ export function ResumeUpload({
           <span className="text-xs text-white/40">{progress}%</span>
         </div>
 
-        {/* Progress bar */}
         <div className="h-1.5 w-full rounded-full bg-white/10 overflow-hidden">
           <div
             className="h-full rounded-full bg-gradient-to-r from-violet-500 to-blue-500 transition-all duration-300"
@@ -99,48 +98,53 @@ export function ResumeUpload({
 
   // ── Idle / Error state = drag-and-drop zone ──────────────────────────────
 
-  return (
-    <div>
-      <div
-        onDragOver={(e) => {
-          e.preventDefault();
-          setDragOver(true);
-        }}
-        onDragLeave={() => setDragOver(false)}
-        onDrop={handleDrop}
+  // Replace this in your return statement
+return (
+  <div>
+    <div
+      onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+      onDragLeave={() => setDragOver(false)}
+      onDrop={handleDrop}
+      className={`
+        relative rounded-xl border-2 border-dashed p-8 text-center
+        transition-all duration-200
+        ${dragOver
+          ? "border-violet-400 bg-violet-500/10"
+          : "border-white/20 bg-white/5 hover:border-white/40 hover:bg-white/10"
+        }
+      `}
+    >
+      <input
+        ref={inputRef}
+        type="file"
+        accept=".pdf"
+        style={{ display: "none" }}
+        onChange={handleChange}
+      />
+
+      <div className="text-4xl mb-3">📄</div>
+      <p className="text-white font-medium">
+        {dragOver ? "Drop your resume here" : "Upload your resume"}
+      </p>
+      <p className="text-white/40 text-sm mt-1">PDF only · Max 10MB</p>
+
+      {/* Explicit button instead of div onClick */}
+      <button
+        type="button"
         onClick={() => inputRef.current?.click()}
-        className={`
-          relative cursor-pointer rounded-xl border-2 border-dashed p-8 text-center
-          transition-all duration-200
-          ${dragOver
-            ? "border-violet-400 bg-violet-500/10"
-            : "border-white/20 bg-white/5 hover:border-white/40 hover:bg-white/10"
-          }
-        `}
+        className="mt-4 px-4 py-2 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-sm font-medium transition-colors"
       >
-        <input
-          ref={inputRef}
-          type="file"
-          accept="application/pdf"
-          className="hidden"
-          onChange={handleChange}
-        />
+        Browse files
+      </button>
 
-        <div className="text-4xl mb-3">📄</div>
-        <p className="text-white font-medium">
-          {dragOver ? "Drop your resume here" : "Upload your resume"}
-        </p>
-        <p className="text-white/40 text-sm mt-1">
-          PDF only · Max 10MB
-        </p>
-        <p className="text-white/30 text-xs mt-3">
-          AI will extract skills, experience &amp; education automatically
-        </p>
-      </div>
-
-      {error && (
-        <p className="mt-3 text-sm text-red-400 text-center">{error}</p>
-      )}
+      <p className="text-white/30 text-xs mt-3">
+        AI will extract skills, experience &amp; education automatically
+      </p>
     </div>
-  );
+
+    {error && (
+      <p className="mt-3 text-sm text-red-400 text-center">{error}</p>
+    )}
+  </div>
+);
 }

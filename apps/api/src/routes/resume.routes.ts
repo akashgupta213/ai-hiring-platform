@@ -90,11 +90,12 @@ export async function resumeRoutes(fastify: FastifyInstance) {
 
       // Create resume record in DB
       const resume = await prisma.resume.create({
-        data: {
-          candidateId: userId,
-          s3Key,
-        },
-      });
+  data: {
+    candidateId: userId,
+    s3Key,
+    rawText: "",
+  },
+});
 
       // If tied to an application, link it
       if (applicationId) {
